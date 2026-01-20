@@ -6,10 +6,16 @@
     "hint": "是否启用沉浸式控制插件"
   },
   "trigger_keywords": {
-    "description": "触发关键词",
+    "description": "进入关键词",
     "type": "list",
-    "default": ["我要控制你了", "我真的要控制你了", "td", "控制", "启动玩具", "遥控"],
-    "hint": "当用户发送包含这些关键词的消息时，将触发控制模式。每行一个关键词"
+    "default": ["控制", "td"],
+    "hint": "用户发送 /关键词 时触发进入控制模式。例如配置「控制」，用户发送「/控制」即可触发"
+  },
+  "exit_keywords": {
+    "description": "退出关键词",
+    "type": "list",
+    "default": ["拿出来吧", "停止控制", "td stop"],
+    "hint": "用户发送 /关键词 时触发退出控制模式。例如配置「拿出来吧」，用户发送「/拿出来吧」即可退出"
   },
   "interactive_item_name": {
     "description": "装置名称",

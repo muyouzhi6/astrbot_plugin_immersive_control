@@ -1,5 +1,5 @@
 """
-AstrBot 沉浸式控制插件 - 重构版 v2.1
+AstrBot 沉浸式控制插件 - 重构版 v2.2
 
 基于 AstrBot v4.12.3 框架规范重构，实现：
 - 配置系统：使用 AstrBotConfig（框架注入）
@@ -8,10 +8,11 @@ AstrBot 沉浸式控制插件 - 重构版 v2.1
 - 优雅退出：注入"状态结束"提示词，对话不割裂
 - 并发安全：使用 asyncio.Lock 保护状态读写
 - 数据清理：自动清理过期冷却和 EXIT_PENDING 数据
+- 防误触：使用 /关键词 精确匹配，进入退出都可自定义
 
 @author: 木有知
 @refactor: AI Assistant
-@version: 2.1.0
+@version: 2.2.0
 """
 
 import asyncio
@@ -421,49 +422,80 @@ class Main(star.Star):
 
     # ========== 触发检测 ==========
 
-    def should_trigger(self, event: AstrMessageEvent) -> Tuple[bool, str]:
-        """检查消息是否应该触发控制状态"""
+    def _check_command_trigger(self, message: str, keywords: list) -> Tuple[bool, str]:
+        """
+        检查消息是否为 /关键词 格式的精确命令
+        
+        Args:
+            message: 消息内容
+            keywords: 关键词列表
+            
+        Returns:
+            (is_triggered, matched_keyword)
+        """
+        message = message.strip()
+        
+        # 必须以 / 开头
+        if not message.startswith("/"):
+            return False, ""
+        
+        # 提取命令部分（去掉 /）
+        command = message[1:].strip().lower()
+        
+        for keyword in keywords:
+            keyword_clean = keyword.strip().lower()
+            if not keyword_clean:
+                continue
+            
+            # 精确匹配
+            if command == keyword_clean:
+                return True, keyword
+        
+        return False, ""
+
+    def should_trigger_enter(self, event: AstrMessageEvent) -> Tuple[bool, str]:
+        """检查消息是否应该触发进入控制状态"""
         # 检查插件是否启用
         if not self._cfg_bool("enabled", True):
             return False, "插件未启用"
-
-        # 检查是否 @机器人
-        if not getattr(event, "is_at_or_wake_command", False):
-            return False, "消息未@机器人"
 
         # 获取消息内容
         message = getattr(event, "message_str", "").strip()
         if not message:
             return False, "消息内容为空"
 
-        # 检查关键词
+        # 检查进入关键词
         keywords = self._cfg_list("trigger_keywords", [])
         if not keywords:
-            return False, "未配置触发关键词"
+            return False, "未配置进入关键词"
 
-        message_lower = message.lower()
+        triggered, keyword = self._check_command_trigger(message, keywords)
+        if triggered:
+            return True, f"匹配进入关键词: {keyword}"
 
-        for keyword in keywords:
-            keyword_lower = keyword.lower().strip()
-            if not keyword_lower:
-                continue
+        return False, "未匹配到进入关键词"
 
-            # 对于短关键词（<=2字符），要求完全匹配或作为独立词
-            if len(keyword_lower) <= 2:
-                # 检查是否完全匹配
-                if message_lower == keyword_lower:
-                    return True, f"匹配关键词: {keyword}"
-                # 检查是否作为独立词出现（前后是空格或标点）
-                import re
-                pattern = r'(?:^|[\s,.!?;:，。！？；：])' + re.escape(keyword_lower) + r'(?:$|[\s,.!?;:，。！？；：])'
-                if re.search(pattern, message_lower):
-                    return True, f"匹配关键词: {keyword}"
-            else:
-                # 长关键词使用包含匹配
-                if keyword_lower in message_lower:
-                    return True, f"匹配关键词: {keyword}"
+    def should_trigger_exit(self, event: AstrMessageEvent) -> Tuple[bool, str]:
+        """检查消息是否应该触发退出控制状态"""
+        # 检查插件是否启用
+        if not self._cfg_bool("enabled", True):
+            return False, "插件未启用"
 
-        return False, "未匹配到触发关键词"
+        # 获取消息内容
+        message = getattr(event, "message_str", "").strip()
+        if not message:
+            return False, "消息内容为空"
+
+        # 检查退出关键词
+        keywords = self._cfg_list("exit_keywords", [])
+        if not keywords:
+            return False, "未配置退出关键词"
+
+        triggered, keyword = self._check_command_trigger(message, keywords)
+        if triggered:
+            return True, f"匹配退出关键词: {keyword}"
+
+        return False, "未匹配到退出关键词"
 
     # ========== LLM 请求钩子 ==========
 
@@ -518,18 +550,34 @@ class Main(star.Star):
 
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def message_handler(self, event: AstrMessageEvent):
-        """消息处理入口"""
-        should_trigger, reason = self.should_trigger(event)
-
-        if not should_trigger:
-            return
-
-        self._log("info", f"触发检测通过: {reason}")
-
+        """消息处理入口：处理进入和退出触发"""
         session_key = getattr(event, "unified_msg_origin", "")
         if not session_key:
-            self._log("warning", "无法获取会话ID")
             return
+
+        # 优先检查退出触发（在沉浸状态中时）
+        current_state, _ = await self.get_session_state(session_key)
+        
+        if current_state == SessionState.ACTIVE:
+            # 当前在沉浸状态中，检查是否触发退出
+            should_exit, exit_reason = self.should_trigger_exit(event)
+            if should_exit:
+                self._log("info", f"退出触发检测通过: {exit_reason}", session_key)
+                
+                # 转为 EXIT_PENDING，让下次 LLM 请求时注入退出提示词
+                success, _ = await self.deactivate_state(session_key)
+                if success:
+                    self._log("info", "已设置为退出待定状态，等待 LLM 自然回复", session_key)
+                    # 不返回任何消息，让消息继续传递给 LLM
+                    # LLM 会在 on_llm_request 中收到退出提示词并自然回复
+                return
+
+        # 检查进入触发
+        should_enter, enter_reason = self.should_trigger_enter(event)
+        if not should_enter:
+            return
+
+        self._log("info", f"进入触发检测通过: {enter_reason}")
 
         # 权限检查
         has_permission, perm_reason = self._check_permission(event)
@@ -548,7 +596,7 @@ class Main(star.Star):
 
         if success:
             # 不返回任何消息，让 LLM 在注入的提示词影响下自然回复
-            self._log("info", f"控制状态已激活", session_key)
+            self._log("info", "控制状态已激活", session_key)
             return
         else:
             # 激活失败，返回提示
@@ -569,7 +617,7 @@ class Main(star.Star):
 
     @filter.command("imm_stop")
     async def stop_command(self, event: AstrMessageEvent):
-        """退出沉浸状态（不重置上下文）"""
+        """退出沉浸状态（管理命令，返回固定文字）"""
         session_key = getattr(event, "unified_msg_origin", "")
         success, message = await self.deactivate_state(session_key)
         yield event.plain_result(message)
@@ -646,11 +694,15 @@ class Main(star.Star):
     @filter.command("imm_help")
     async def help_command(self, event: AstrMessageEvent):
         """显示帮助信息"""
-        help_text = """=== 沉浸式控制插件帮助 ===
+        enter_keywords = self._cfg_list("trigger_keywords", ["控制"])
+        exit_keywords = self._cfg_list("exit_keywords", ["拿出来吧"])
+        
+        help_text = f"""=== 沉浸式控制插件帮助 ===
 
 用户命令:
-  @机器人 + 触发词 : 激活沉浸状态
-  /imm_stop : 退出沉浸状态（保留对话上下文）
+  /{enter_keywords[0] if enter_keywords else '控制'} : 进入沉浸状态（LLM 自然回复）
+  /{exit_keywords[0] if exit_keywords else '拿出来吧'} : 退出沉浸状态（LLM 自然回复）
+  /imm_stop : 强制退出（固定文字回复）
   /imm_help : 显示此帮助
 
 管理员命令:
@@ -659,6 +711,8 @@ class Main(star.Star):
   /imm_toggle : 查看启用状态
 
 配置说明:
+  进入关键词: {', '.join(enter_keywords) if enter_keywords else '未配置'}
+  退出关键词: {', '.join(exit_keywords) if exit_keywords else '未配置'}
   所有配置请在 AstrBot WebUI 的插件配置页面中修改"""
         yield event.plain_result(help_text)
 
@@ -666,8 +720,9 @@ class Main(star.Star):
 
     async def initialize(self):
         """插件初始化"""
-        logger.info("沉浸式控制插件 v2.1.0 已加载")
-        logger.info(f"  - 触发关键词: {self._cfg_list('trigger_keywords', [])}")
+        logger.info("沉浸式控制插件 v2.2.0 已加载")
+        logger.info(f"  - 进入关键词: {self._cfg_list('trigger_keywords', [])}")
+        logger.info(f"  - 退出关键词: {self._cfg_list('exit_keywords', [])}")
         logger.info(f"  - 状态持续时间: {self._cfg_int('state_duration_seconds', 180, 10, 3600)}s")
         logger.info(f"  - 敏感度等级: {self._cfg_int('sensitivity_level', 50, 0, 100)}%")
         logger.info(f"  - 仅管理员模式: {self._cfg_bool('admin_only_mode', False)}")
