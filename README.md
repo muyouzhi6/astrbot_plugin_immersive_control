@@ -94,14 +94,6 @@ log_level: "INFO"
 - `/imm_list_users` - 查看授权用户列表
 - `/imm_info` - 查看插件详细信息
 
-## 🌐 WebUI 配置
-
-插件支持通过 AstrBot 的 WebUI 进行可视化配置：
-
-1. 访问 AstrBot WebUI（默认：http://localhost:6185）
-2. 登录后进入插件管理页面
-3. 找到"沉浸式互动控制"插件
-4. 点击配置按钮进行可视化设置
 
 ## 🔧 高级功能
 
