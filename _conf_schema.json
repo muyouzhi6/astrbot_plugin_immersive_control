@@ -3,7 +3,7 @@
     "description": "启用插件",
     "type": "bool",
     "default": true,
-    "hint": "是否启用小玩具控制插件"
+    "hint": "是否启用沉浸式控制插件"
   },
   "trigger_keywords": {
     "description": "触发关键词",
@@ -12,10 +12,10 @@
     "hint": "当用户发送包含这些关键词的消息时，将触发控制模式。每行一个关键词"
   },
   "interactive_item_name": {
-    "description": "小玩具名称",
+    "description": "装置名称",
     "type": "string",
     "default": "特殊装置",
-    "hint": "在提示词中显示的小玩具设备名称，可以自定义为任何你想要的名称"
+    "hint": "在提示词中显示的装置名称，可以自定义为任何你想要的名称"
   },
   "state_duration_seconds": {
     "description": "控制持续时间（秒）",
@@ -52,5 +52,17 @@
     "type": "bool",
     "default": true,
     "hint": "是否在日志中记录控制相关的互动信息"
+  },
+  "system_prompt_template": {
+    "description": "自定义系统提示词模板",
+    "type": "string",
+    "default": "",
+    "hint": "自定义控制模式下的系统提示词。留空使用默认模板。可用变量：{item_name}、{sensitivity}"
+  },
+  "exit_notice_template": {
+    "description": "自定义退出提示词模板",
+    "type": "string",
+    "default": "",
+    "hint": "自定义退出控制模式时的提示词。留空使用默认模板。可用变量：{item_name}"
   }
 }

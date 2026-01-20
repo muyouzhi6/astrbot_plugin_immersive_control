@@ -1,5 +1,5 @@
 name: astrbot_plugin_immersive_control
-desc: 🎮 给AI植入神奇小玩具的娱乐插件！一键"遥控"让AI瞬间害羞结巴，3分钟沉浸式互动体验～
+desc: 🎮 沉浸式互动控制插件 - 让AI进入特殊互动模式，支持快速启动/退出，状态持久化，对话不割裂
 author: 木有知
-version: 1.0.0
+version: 2.1.0
 repo: https://github.com/muyouzhi6/astrbot_plugin_immersive_control
