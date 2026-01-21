@@ -1,5 +1,5 @@
 name: astrbot_plugin_immersive_control
-display_name: 沉浸式互动控制插件
+display_name: 沉浸式控制
 desc: 让AI进入特殊互动模式，支持自定义进入/退出关键词，LLM自然回复，状态持久化
 author: 木有知
 version: 2.3.0
