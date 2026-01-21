@@ -1,6 +1,6 @@
 name: astrbot_plugin_immersive_control
-display_name: 沉浸式控制
-desc: 让AI进入特殊互动模式，支持自定义进入/退出关键词，LLM自然回复，状态持久化
+display_name: 我真的要控制你了
+desc: 给 Bot 塞个小玩具，遥控它！3分钟沉浸式互动，看 AI 害羞结巴
 author: 木有知
 version: 2.3.0
 repo: https://github.com/muyouzhi6/astrbot_plugin_immersive_control
