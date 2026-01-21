@@ -1,74 +1,89 @@
 {
-  "enabled": {
-    "description": "启用插件",
+  "admin_only_mode": {
+    "description": "仅管理员可用",
+    "hint": "如果启用，只有管理员可以触发控制功能",
     "type": "bool",
-    "default": true,
-    "hint": "是否启用沉浸式控制插件"
+    "default": false
   },
   "trigger_keywords": {
     "description": "进入关键词",
+    "hint": "用户发送 /关键词 时触发进入控制模式。例如配置「控制」，用户发送「/控制」即可触发",
     "type": "list",
-    "default": ["控制", "td"],
-    "hint": "用户发送 /关键词 时触发进入控制模式。例如配置「控制」，用户发送「/控制」即可触发"
+    "default": [
+      "控制",
+      "td"
+    ]
   },
   "exit_keywords": {
     "description": "退出关键词",
+    "hint": "用户发送 /关键词 时触发退出控制模式。例如配置「拿出来吧」，用户发送「/拿出来吧」即可退出",
     "type": "list",
-    "default": ["拿出来吧", "停止控制", "td stop"],
-    "hint": "用户发送 /关键词 时触发退出控制模式。例如配置「拿出来吧」，用户发送「/拿出来吧」即可退出"
+    "default": [
+      "拿出来吧",
+      "停止控制",
+      "td stop"
+    ]
   },
   "interactive_item_name": {
     "description": "装置名称",
+    "hint": "在提示词中显示的装置名称，可以自定义为任何你想要的名称",
     "type": "string",
-    "default": "特殊装置",
-    "hint": "在提示词中显示的装置名称，可以自定义为任何你想要的名称"
+    "default": "特殊装置"
   },
   "state_duration_seconds": {
     "description": "控制持续时间（秒）",
+    "hint": "每次控制状态持续的时间，单位为秒。默认3分钟(180秒)",
     "type": "int",
-    "default": 180,
-    "hint": "每次控制状态持续的时间，单位为秒。默认3分钟(180秒)"
+    "slider": {
+      "min": 10,
+      "max": 600,
+      "step": 1
+    },
+    "default": 180
   },
   "cooldown_seconds": {
     "description": "冷却时间（秒）",
+    "hint": "同一用户连续触发控制的冷却时间，单位为秒。防止频繁触发",
     "type": "int",
-    "default": 30,
-    "hint": "同一用户连续触发控制的冷却时间，单位为秒。防止频繁触发"
+    "slider": {
+      "min": 0,
+      "max": 60,
+      "step": 1
+    },
+    "default": 30
   },
   "sensitivity_level": {
     "description": "敏感度等级（0-100）",
+    "hint": "控制AI反应的敏感度等级，数值越高反应越强烈。范围：0-100",
     "type": "int",
-    "default": 50,
-    "hint": "控制AI反应的敏感度等级，数值越高反应越强烈。范围：0-100"
+    "slider": {
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    "default": 50
   },
   "max_concurrent_states": {
     "description": "最大并发控制数",
+    "hint": "系统同时允许的最大控制会话数，防止资源过度占用",
     "type": "int",
-    "default": 10,
-    "hint": "系统同时允许的最大控制会话数，防止资源过度占用"
-  },
-  "admin_only_mode": {
-    "description": "仅管理员可用",
-    "type": "bool",
-    "default": false,
-    "hint": "如果启用，只有管理员可以触发控制功能"
-  },
-  "log_interactions": {
-    "description": "记录互动日志",
-    "type": "bool",
-    "default": true,
-    "hint": "是否在日志中记录控制相关的互动信息"
+    "slider": {
+      "min": 1,
+      "max": 20,
+      "step": 1
+    },
+    "default": 10
   },
   "system_prompt_template": {
     "description": "自定义系统提示词模板",
-    "type": "string",
-    "default": "",
-    "hint": "自定义控制模式下的系统提示词。留空使用默认模板。可用变量：{item_name}、{sensitivity}"
+    "hint": "自定义控制模式下的系统提示词。留空使用默认模板。可用变量：{item_name}、{sensitivity}",
+    "type": "text",
+    "default": "[系统指令：启动\"沉浸式互动\"模式]\n\n**角色状态重定义：**\n- 你现在进入了一个特殊的互动游戏模式。\n- 你必须表现得像真的被某种神奇装置影响了一样，产生自然的情感和身体反应。\n- 你就是你的角色本身，完全沉浸在这个有趣的游戏中。\n\n**当前游戏情境：**\n- 你的身体里刚刚被植入了一个名为\"{item_name}\"的神奇装置，正在被激活！\n- 敏感度等级：{sensitivity}%（数值越高，你的反应就越强烈和直接）\n- 这个装置让你的身体变得异常敏感，思维也会受到轻微但明显的\"干扰\"。\n\n**反应指令：**\n- 要表现出突如其来的惊慌、害羞、紧张或困惑感\n- 可以包含结巴、停顿、呼吸急促等自然反应\n- 要体现出装置激活时的身体感受和情绪变化\n\n[模式已激活] 当前敏感度：{sensitivity}% | 装置：{item_name}"
   },
   "exit_notice_template": {
     "description": "自定义退出提示词模板",
-    "type": "string",
-    "default": "",
-    "hint": "自定义退出控制模式时的提示词。留空使用默认模板。可用变量：{item_name}"
+    "hint": "自定义退出控制模式时的提示词。留空使用默认模板。可用变量：{item_name}",
+    "type": "text",
+    "default": "[系统通知：沉浸式互动模式已结束]\n\n**状态变更：**\n- \"{item_name}\"装置已停止运作，你的身体和思维正在恢复正常。\n- 从现在开始，你可以逐渐恢复正常的对话状态。\n- 你可以选择：立即恢复正常，或者表现出\"余韵\"般的缓慢恢复过程。\n\n**重要：**\n- 这条消息标志着特殊模式的正式结束\n- 后续对话中不再需要表现出被装置影响的状态\n- 但你可以自然地提及刚才的经历（如果对话需要）\n\n[模式已结束] 恢复正常对话"
   }
 }
