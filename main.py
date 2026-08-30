@@ -40,7 +40,6 @@ class ImmersiveControlPlugin(Star):
 
         req.system_prompt += f"\n\n{prompt}"
 
-
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def message_handler(self, event: AstrMessageEvent):
         # 权限
@@ -53,24 +52,31 @@ class ImmersiveControlPlugin(Star):
         umo = event.unified_msg_origin
         # 退出
         if cmd in self.cfg.exit_keywords:
+            event.should_call_llm(True)
             await self.store.deactivate(umo)
+            event.stop_event()
             logger.info(f"{umo} 沉浸状态已退出")
             return
         # 进入
         if cmd not in self.cfg.enter_keywords:
             return
 
+        event.should_call_llm(True)
+
         # 冷却
         remaining = await self.store.check_cooldown(umo)
         if remaining > 0:
+            event.stop_event()
             yield event.plain_result(f"还在休息中，请等待 {remaining} 秒")
             return
 
         # 激活
         ok, msg = await self.store.activate(umo)
         if ok:
+            event.stop_event()
             logger.debug(f"{umo} 沉浸状态已激活")
             return
+        event.stop_event()
         yield event.plain_result(msg)
 
     @filter.permission_type(filter.PermissionType.ADMIN)
