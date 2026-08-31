@@ -62,8 +62,20 @@ class ImmersiveControlPlugin(Star):
         # 退出
         if message in self.cfg.exit_keywords or cmd in self.cfg.exit_keywords:
             if await self.store.deactivate(umo):
-                event.should_call_llm(False)
+                await self.store.complete_exit(umo)
+                event.should_call_llm(True)
+                event.stop_event()
                 logger.info(f"{umo} 沉浸状态已退出")
+                reply = getattr(self.cfg, "exit_reply", None) or (
+                    "呼……终于停下来了，先让我缓缓。"
+                )
+                reply = reply.replace(
+                    "{item_name}", str(getattr(self.cfg, "item_name", "特殊装置"))
+                )
+                reply = reply.replace(
+                    "{sensitivity}", str(getattr(self.cfg, "sensitivity", 50))
+                )
+                yield event.plain_result(reply)
                 return
             event.should_call_llm(True)
             event.stop_event()
@@ -86,8 +98,19 @@ class ImmersiveControlPlugin(Star):
         # 激活
         ok, msg = await self.store.activate(umo)
         if ok:
-            event.should_call_llm(False)
+            event.should_call_llm(True)
+            event.stop_event()
             logger.debug(f"{umo} 沉浸状态已激活")
+            reply = getattr(self.cfg, "enter_reply", None) or (
+                "啊？！等等……{item_name}怎么突然启动了！"
+            )
+            reply = reply.replace(
+                "{item_name}", str(getattr(self.cfg, "item_name", "特殊装置"))
+            )
+            reply = reply.replace(
+                "{sensitivity}", str(getattr(self.cfg, "sensitivity", 50))
+            )
+            yield event.plain_result(reply)
             return
         event.should_call_llm(True)
         event.stop_event()

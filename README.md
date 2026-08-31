@@ -43,7 +43,13 @@ sensitivity: 50
 
 # 冷却时间（秒）
 cooldown_seconds: 30
+
+# 进入/退出时的即时反应（可选）
+enter_reply: "啊？！等等……{item_name}怎么突然启动了！"
+exit_reply: "呼……终于停下来了，先让我缓缓。"
 ```
+
+`{item_name}` 和 `{sensitivity}` 会替换为当前配置值。进入或退出指令会先发送即时反应，后续普通消息继续由 LLM 生成沉浸式回复。
 
 也支持 WebUI 可视化配置。
 

@@ -148,7 +148,7 @@ class _Store:
 
 
 class MessageHandlerTests(unittest.IsolatedAsyncioTestCase):
-    async def test_enter_keeps_default_llm_for_activation_reaction(self):
+    async def test_enter_sends_immediate_activation_reaction(self):
         mod = _load_module()
         plugin = object.__new__(mod.ImmersiveControlPlugin)
         plugin.cfg = types.SimpleNamespace(
@@ -159,11 +159,11 @@ class MessageHandlerTests(unittest.IsolatedAsyncioTestCase):
         plugin.store = _Store()
         event = _Event("进入")
 
-        async for _ in plugin.message_handler(event):
-            pass
+        results = [result async for result in plugin.message_handler(event)]
 
-        self.assertFalse(event.call_llm)
-        self.assertFalse(event.stopped)
+        self.assertTrue(event.call_llm)
+        self.assertTrue(event.stopped)
+        self.assertEqual(results, ["啊？！等等……特殊装置怎么突然启动了！"])
         self.assertEqual(plugin.store.activated, [event.unified_msg_origin])
 
     async def test_multiword_exit_keyword_is_matched(self):
@@ -177,14 +177,15 @@ class MessageHandlerTests(unittest.IsolatedAsyncioTestCase):
         plugin.store = _Store()
         event = _Event("td stop")
 
-        async for _ in plugin.message_handler(event):
-            pass
+        results = [result async for result in plugin.message_handler(event)]
 
-        self.assertFalse(event.call_llm)
-        self.assertFalse(event.stopped)
+        self.assertTrue(event.call_llm)
+        self.assertTrue(event.stopped)
+        self.assertEqual(results, ["呼……终于停下来了，先让我缓缓。"])
         self.assertEqual(plugin.store.deactivated, [event.unified_msg_origin])
+        self.assertEqual(plugin.store.completed_exits, [event.unified_msg_origin])
 
-    async def test_exit_keeps_default_llm_for_exit_reaction(self):
+    async def test_exit_sends_immediate_reaction(self):
         mod = _load_module()
         plugin = object.__new__(mod.ImmersiveControlPlugin)
         plugin.cfg = types.SimpleNamespace(
@@ -195,12 +196,13 @@ class MessageHandlerTests(unittest.IsolatedAsyncioTestCase):
         plugin.store = _Store()
         event = _Event("退出")
 
-        async for _ in plugin.message_handler(event):
-            pass
+        results = [result async for result in plugin.message_handler(event)]
 
-        self.assertFalse(event.call_llm)
-        self.assertFalse(event.stopped)
+        self.assertTrue(event.call_llm)
+        self.assertTrue(event.stopped)
+        self.assertEqual(results, ["呼……终于停下来了，先让我缓缓。"])
         self.assertEqual(plugin.store.deactivated, [event.unified_msg_origin])
+        self.assertEqual(plugin.store.completed_exits, [event.unified_msg_origin])
 
     async def test_cooldown_failure_also_consumes_event(self):
         mod = _load_module()
