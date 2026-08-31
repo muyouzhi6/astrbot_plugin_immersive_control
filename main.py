@@ -39,7 +39,14 @@ class ImmersiveControlPlugin(Star):
         prompt = prompt.replace("{item_name}", str(self.cfg.item_name))
         prompt = prompt.replace("{sensitivity}", str(self.cfg.sensitivity))
 
-        req.extra_user_content_parts.append(TextPart(text=prompt))
+        message = (event.message_str or "").strip()
+        command = message.partition(" ")[0]
+        control_commands = set(self.cfg.enter_keywords) | set(self.cfg.exit_keywords)
+        if message in control_commands or command in control_commands:
+            # The activation/exit turn needs system-level priority for an immediate reaction.
+            req.system_prompt += f"\n\n{prompt}"
+        else:
+            req.extra_user_content_parts.append(TextPart(text=prompt))
 
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def message_handler(self, event: AstrMessageEvent):
@@ -49,10 +56,11 @@ class ImmersiveControlPlugin(Star):
         # 指令
         if not event.message_str:
             return
-        cmd = event.message_str.partition(" ")[0]
+        message = event.message_str.strip()
+        cmd = message.partition(" ")[0]
         umo = event.unified_msg_origin
         # 退出
-        if cmd in self.cfg.exit_keywords:
+        if message in self.cfg.exit_keywords or cmd in self.cfg.exit_keywords:
             if await self.store.deactivate(umo):
                 event.should_call_llm(False)
                 logger.info(f"{umo} 沉浸状态已退出")
@@ -61,7 +69,10 @@ class ImmersiveControlPlugin(Star):
             event.stop_event()
             return
         # 进入
-        if cmd not in self.cfg.enter_keywords:
+        if (
+            message not in self.cfg.enter_keywords
+            and cmd not in self.cfg.enter_keywords
+        ):
             return
 
         # 冷却

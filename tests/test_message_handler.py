@@ -166,6 +166,24 @@ class MessageHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(event.stopped)
         self.assertEqual(plugin.store.activated, [event.unified_msg_origin])
 
+    async def test_multiword_exit_keyword_is_matched(self):
+        mod = _load_module()
+        plugin = object.__new__(mod.ImmersiveControlPlugin)
+        plugin.cfg = types.SimpleNamespace(
+            admin_only_mode=False,
+            enter_keywords={"进入"},
+            exit_keywords={"td stop"},
+        )
+        plugin.store = _Store()
+        event = _Event("td stop")
+
+        async for _ in plugin.message_handler(event):
+            pass
+
+        self.assertFalse(event.call_llm)
+        self.assertFalse(event.stopped)
+        self.assertEqual(plugin.store.deactivated, [event.unified_msg_origin])
+
     async def test_exit_keeps_default_llm_for_exit_reaction(self):
         mod = _load_module()
         plugin = object.__new__(mod.ImmersiveControlPlugin)
@@ -226,9 +244,11 @@ class MessageHandlerTests(unittest.IsolatedAsyncioTestCase):
             exit_template="stopped {item_name} {sensitivity}",
             item_name="toy",
             sensitivity=50,
+            enter_keywords={"进入"},
+            exit_keywords={"退出"},
         )
         plugin.store = _Store(record=types.SimpleNamespace(active=True, exit_ts=None))
-        event = _Event("进入")
+        event = _Event("你好")
         req = types.SimpleNamespace(
             system_prompt="persona", extra_user_content_parts=[]
         )
@@ -242,6 +262,28 @@ class MessageHandlerTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(plugin.store.completed_exits, [])
 
+    async def test_activation_turn_uses_system_priority(self):
+        mod = _load_module()
+        plugin = object.__new__(mod.ImmersiveControlPlugin)
+        plugin.cfg = types.SimpleNamespace(
+            enter_template="activated {item_name} {sensitivity}",
+            exit_template="stopped {item_name} {sensitivity}",
+            item_name="toy",
+            sensitivity=50,
+            enter_keywords={"进入"},
+            exit_keywords={"退出"},
+        )
+        plugin.store = _Store(record=types.SimpleNamespace(active=True, exit_ts=None))
+        event = _Event("进入")
+        req = types.SimpleNamespace(
+            system_prompt="persona", extra_user_content_parts=[]
+        )
+
+        await plugin.on_llm_request(event, req)
+
+        self.assertEqual(req.system_prompt, "persona\n\nactivated toy 50")
+        self.assertEqual(req.extra_user_content_parts, [])
+
     async def test_exit_state_injects_once_and_completes_exit(self):
         mod = _load_module()
         plugin = object.__new__(mod.ImmersiveControlPlugin)
@@ -250,6 +292,8 @@ class MessageHandlerTests(unittest.IsolatedAsyncioTestCase):
             exit_template="stopped {item_name} {sensitivity}",
             item_name="toy",
             sensitivity=50,
+            enter_keywords={"进入"},
+            exit_keywords={"退出"},
         )
         plugin.store = _Store(record=types.SimpleNamespace(active=False, exit_ts=1.0))
         event = _Event("退出")
@@ -259,11 +303,8 @@ class MessageHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         await plugin.on_llm_request(event, req)
 
-        self.assertEqual(req.system_prompt, "persona")
-        self.assertEqual(
-            [part.text for part in req.extra_user_content_parts],
-            ["stopped toy 50"],
-        )
+        self.assertEqual(req.system_prompt, "persona\n\nstopped toy 50")
+        self.assertEqual(req.extra_user_content_parts, [])
         self.assertEqual(
             plugin.store.completed_exits,
             [event.unified_msg_origin],
