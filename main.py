@@ -3,6 +3,7 @@ import time
 from astrbot import logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.provider import ProviderRequest
+from astrbot.core.agent.message import TextPart
 from astrbot.core.config.astrbot_config import AstrBotConfig
 from astrbot.core.star import Star
 from astrbot.core.star.context import Context
@@ -38,7 +39,7 @@ class ImmersiveControlPlugin(Star):
         prompt = prompt.replace("{item_name}", str(self.cfg.item_name))
         prompt = prompt.replace("{sensitivity}", str(self.cfg.sensitivity))
 
-        req.system_prompt += f"\n\n{prompt}"
+        req.extra_user_content_parts.append(TextPart(text=prompt))
 
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def message_handler(self, event: AstrMessageEvent):

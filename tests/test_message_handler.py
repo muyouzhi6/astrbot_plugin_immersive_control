@@ -17,6 +17,8 @@ def _load_module():
             "astrbot.api.event",
             "astrbot.api.provider",
             "astrbot.core",
+            "astrbot.core.agent",
+            "astrbot.core.agent.message",
             "astrbot.core.config",
             "astrbot.core.config.astrbot_config",
             "astrbot.core.star",
@@ -59,6 +61,16 @@ def _load_module():
     provider_mod = types.ModuleType("astrbot.api.provider")
     provider_mod.ProviderRequest = object
     sys.modules["astrbot.api.provider"] = provider_mod
+
+    class TextPart:
+        def __init__(self, text):
+            self.text = text
+
+    agent_mod = types.ModuleType("astrbot.core.agent")
+    message_mod = types.ModuleType("astrbot.core.agent.message")
+    message_mod.TextPart = TextPart
+    sys.modules["astrbot.core.agent"] = agent_mod
+    sys.modules["astrbot.core.agent.message"] = message_mod
 
     config_mod = types.ModuleType("astrbot.core.config.astrbot_config")
     config_mod.AstrBotConfig = dict
@@ -217,11 +229,17 @@ class MessageHandlerTests(unittest.IsolatedAsyncioTestCase):
         )
         plugin.store = _Store(record=types.SimpleNamespace(active=True, exit_ts=None))
         event = _Event("进入")
-        req = types.SimpleNamespace(system_prompt="persona")
+        req = types.SimpleNamespace(
+            system_prompt="persona", extra_user_content_parts=[]
+        )
 
         await plugin.on_llm_request(event, req)
 
-        self.assertEqual(req.system_prompt, "persona\n\nactivated toy 50")
+        self.assertEqual(req.system_prompt, "persona")
+        self.assertEqual(
+            [part.text for part in req.extra_user_content_parts],
+            ["activated toy 50"],
+        )
         self.assertEqual(plugin.store.completed_exits, [])
 
     async def test_exit_state_injects_once_and_completes_exit(self):
@@ -235,11 +253,17 @@ class MessageHandlerTests(unittest.IsolatedAsyncioTestCase):
         )
         plugin.store = _Store(record=types.SimpleNamespace(active=False, exit_ts=1.0))
         event = _Event("退出")
-        req = types.SimpleNamespace(system_prompt="persona")
+        req = types.SimpleNamespace(
+            system_prompt="persona", extra_user_content_parts=[]
+        )
 
         await plugin.on_llm_request(event, req)
 
-        self.assertEqual(req.system_prompt, "persona\n\nstopped toy 50")
+        self.assertEqual(req.system_prompt, "persona")
+        self.assertEqual(
+            [part.text for part in req.extra_user_content_parts],
+            ["stopped toy 50"],
+        )
         self.assertEqual(
             plugin.store.completed_exits,
             [event.unified_msg_origin],
