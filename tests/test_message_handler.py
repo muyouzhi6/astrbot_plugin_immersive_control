@@ -18,7 +18,6 @@ def _load_module():
             "astrbot.api.provider",
             "astrbot.core",
             "astrbot.core.agent",
-            "astrbot.core.agent.message",
             "astrbot.core.config",
             "astrbot.core.config.astrbot_config",
             "astrbot.core.star",
@@ -62,15 +61,7 @@ def _load_module():
     provider_mod.ProviderRequest = object
     sys.modules["astrbot.api.provider"] = provider_mod
 
-    class TextPart:
-        def __init__(self, text):
-            self.text = text
-
-    agent_mod = types.ModuleType("astrbot.core.agent")
-    message_mod = types.ModuleType("astrbot.core.agent.message")
-    message_mod.TextPart = TextPart
-    sys.modules["astrbot.core.agent"] = agent_mod
-    sys.modules["astrbot.core.agent.message"] = message_mod
+    sys.modules["astrbot.core.agent"] = types.ModuleType("astrbot.core.agent")
 
     config_mod = types.ModuleType("astrbot.core.config.astrbot_config")
     config_mod.AstrBotConfig = dict
@@ -148,7 +139,7 @@ class _Store:
 
 
 class MessageHandlerTests(unittest.IsolatedAsyncioTestCase):
-    async def test_enter_sends_immediate_activation_reaction(self):
+    async def test_enter_allows_default_llm_reaction(self):
         mod = _load_module()
         plugin = object.__new__(mod.ImmersiveControlPlugin)
         plugin.cfg = types.SimpleNamespace(
@@ -161,28 +152,10 @@ class MessageHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         results = [result async for result in plugin.message_handler(event)]
 
-        self.assertTrue(event.call_llm)
-        self.assertTrue(event.stopped)
-        self.assertEqual(results, ["啊？！等等……特殊装置怎么突然启动了！"])
+        self.assertFalse(event.call_llm)
+        self.assertFalse(event.stopped)
+        self.assertEqual(results, [])
         self.assertEqual(plugin.store.activated, [event.unified_msg_origin])
-
-    async def test_enter_uses_configured_immediate_reaction(self):
-        mod = _load_module()
-        plugin = object.__new__(mod.ImmersiveControlPlugin)
-        plugin.cfg = types.SimpleNamespace(
-            admin_only_mode=False,
-            enter_keywords={"进入"},
-            exit_keywords={"退出"},
-            enter_reply="启动 {item_name}，敏感度 {sensitivity}%",
-            item_name="toy",
-            sensitivity=80,
-        )
-        plugin.store = _Store()
-        event = _Event("进入")
-
-        results = [result async for result in plugin.message_handler(event)]
-
-        self.assertEqual(results, ["启动 toy，敏感度 80%"])
 
     async def test_multiword_exit_keyword_is_matched(self):
         mod = _load_module()
@@ -197,13 +170,13 @@ class MessageHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         results = [result async for result in plugin.message_handler(event)]
 
-        self.assertTrue(event.call_llm)
-        self.assertTrue(event.stopped)
-        self.assertEqual(results, ["呼……终于停下来了，先让我缓缓。"])
+        self.assertFalse(event.call_llm)
+        self.assertFalse(event.stopped)
+        self.assertEqual(results, [])
         self.assertEqual(plugin.store.deactivated, [event.unified_msg_origin])
-        self.assertEqual(plugin.store.completed_exits, [event.unified_msg_origin])
+        self.assertEqual(plugin.store.completed_exits, [])
 
-    async def test_exit_sends_immediate_reaction(self):
+    async def test_exit_allows_default_llm_reaction(self):
         mod = _load_module()
         plugin = object.__new__(mod.ImmersiveControlPlugin)
         plugin.cfg = types.SimpleNamespace(
@@ -216,11 +189,11 @@ class MessageHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         results = [result async for result in plugin.message_handler(event)]
 
-        self.assertTrue(event.call_llm)
-        self.assertTrue(event.stopped)
-        self.assertEqual(results, ["呼……终于停下来了，先让我缓缓。"])
+        self.assertFalse(event.call_llm)
+        self.assertFalse(event.stopped)
+        self.assertEqual(results, [])
         self.assertEqual(plugin.store.deactivated, [event.unified_msg_origin])
-        self.assertEqual(plugin.store.completed_exits, [event.unified_msg_origin])
+        self.assertEqual(plugin.store.completed_exits, [])
 
     async def test_cooldown_failure_also_consumes_event(self):
         mod = _load_module()
@@ -269,20 +242,14 @@ class MessageHandlerTests(unittest.IsolatedAsyncioTestCase):
         )
         plugin.store = _Store(record=types.SimpleNamespace(active=True, exit_ts=None))
         event = _Event("你好")
-        req = types.SimpleNamespace(
-            system_prompt="persona", extra_user_content_parts=[]
-        )
+        req = types.SimpleNamespace(system_prompt="persona")
 
         await plugin.on_llm_request(event, req)
 
-        self.assertEqual(req.system_prompt, "persona")
-        self.assertEqual(
-            [part.text for part in req.extra_user_content_parts],
-            ["activated toy 50"],
-        )
+        self.assertEqual(req.system_prompt, "persona\n\nactivated toy 50")
         self.assertEqual(plugin.store.completed_exits, [])
 
-    async def test_activation_turn_uses_system_priority(self):
+    async def test_activation_turn_uses_system_prompt(self):
         mod = _load_module()
         plugin = object.__new__(mod.ImmersiveControlPlugin)
         plugin.cfg = types.SimpleNamespace(
@@ -295,14 +262,11 @@ class MessageHandlerTests(unittest.IsolatedAsyncioTestCase):
         )
         plugin.store = _Store(record=types.SimpleNamespace(active=True, exit_ts=None))
         event = _Event("进入")
-        req = types.SimpleNamespace(
-            system_prompt="persona", extra_user_content_parts=[]
-        )
+        req = types.SimpleNamespace(system_prompt="persona")
 
         await plugin.on_llm_request(event, req)
 
         self.assertEqual(req.system_prompt, "persona\n\nactivated toy 50")
-        self.assertEqual(req.extra_user_content_parts, [])
 
     async def test_exit_state_injects_once_and_completes_exit(self):
         mod = _load_module()
@@ -317,14 +281,11 @@ class MessageHandlerTests(unittest.IsolatedAsyncioTestCase):
         )
         plugin.store = _Store(record=types.SimpleNamespace(active=False, exit_ts=1.0))
         event = _Event("退出")
-        req = types.SimpleNamespace(
-            system_prompt="persona", extra_user_content_parts=[]
-        )
+        req = types.SimpleNamespace(system_prompt="persona")
 
         await plugin.on_llm_request(event, req)
 
         self.assertEqual(req.system_prompt, "persona\n\nstopped toy 50")
-        self.assertEqual(req.extra_user_content_parts, [])
         self.assertEqual(
             plugin.store.completed_exits,
             [event.unified_msg_origin],

@@ -3,7 +3,6 @@ import time
 from astrbot import logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.provider import ProviderRequest
-from astrbot.core.agent.message import TextPart
 from astrbot.core.config.astrbot_config import AstrBotConfig
 from astrbot.core.star import Star
 from astrbot.core.star.context import Context
@@ -39,14 +38,7 @@ class ImmersiveControlPlugin(Star):
         prompt = prompt.replace("{item_name}", str(self.cfg.item_name))
         prompt = prompt.replace("{sensitivity}", str(self.cfg.sensitivity))
 
-        message = (event.message_str or "").strip()
-        command = message.partition(" ")[0]
-        control_commands = set(self.cfg.enter_keywords) | set(self.cfg.exit_keywords)
-        if message in control_commands or command in control_commands:
-            # The activation/exit turn needs system-level priority for an immediate reaction.
-            req.system_prompt += f"\n\n{prompt}"
-        else:
-            req.extra_user_content_parts.append(TextPart(text=prompt))
+        req.system_prompt += f"\n\n{prompt}"
 
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def message_handler(self, event: AstrMessageEvent):
@@ -62,20 +54,8 @@ class ImmersiveControlPlugin(Star):
         # 退出
         if message in self.cfg.exit_keywords or cmd in self.cfg.exit_keywords:
             if await self.store.deactivate(umo):
-                await self.store.complete_exit(umo)
-                event.should_call_llm(True)
-                event.stop_event()
+                event.should_call_llm(False)
                 logger.info(f"{umo} 沉浸状态已退出")
-                reply = getattr(self.cfg, "exit_reply", None) or (
-                    "呼……终于停下来了，先让我缓缓。"
-                )
-                reply = reply.replace(
-                    "{item_name}", str(getattr(self.cfg, "item_name", "特殊装置"))
-                )
-                reply = reply.replace(
-                    "{sensitivity}", str(getattr(self.cfg, "sensitivity", 50))
-                )
-                yield event.plain_result(reply)
                 return
             event.should_call_llm(True)
             event.stop_event()
@@ -98,19 +78,8 @@ class ImmersiveControlPlugin(Star):
         # 激活
         ok, msg = await self.store.activate(umo)
         if ok:
-            event.should_call_llm(True)
-            event.stop_event()
+            event.should_call_llm(False)
             logger.debug(f"{umo} 沉浸状态已激活")
-            reply = getattr(self.cfg, "enter_reply", None) or (
-                "啊？！等等……{item_name}怎么突然启动了！"
-            )
-            reply = reply.replace(
-                "{item_name}", str(getattr(self.cfg, "item_name", "特殊装置"))
-            )
-            reply = reply.replace(
-                "{sensitivity}", str(getattr(self.cfg, "sensitivity", 50))
-            )
-            yield event.plain_result(reply)
             return
         event.should_call_llm(True)
         event.stop_event()
