@@ -52,20 +52,21 @@ class ImmersiveControlPlugin(Star):
         umo = event.unified_msg_origin
         # 退出
         if cmd in self.cfg.exit_keywords:
+            if await self.store.deactivate(umo):
+                event.should_call_llm(False)
+                logger.info(f"{umo} 沉浸状态已退出")
+                return
             event.should_call_llm(True)
-            await self.store.deactivate(umo)
             event.stop_event()
-            logger.info(f"{umo} 沉浸状态已退出")
             return
         # 进入
         if cmd not in self.cfg.enter_keywords:
             return
 
-        event.should_call_llm(True)
-
         # 冷却
         remaining = await self.store.check_cooldown(umo)
         if remaining > 0:
+            event.should_call_llm(True)
             event.stop_event()
             yield event.plain_result(f"还在休息中，请等待 {remaining} 秒")
             return
@@ -73,9 +74,10 @@ class ImmersiveControlPlugin(Star):
         # 激活
         ok, msg = await self.store.activate(umo)
         if ok:
-            event.stop_event()
+            event.should_call_llm(False)
             logger.debug(f"{umo} 沉浸状态已激活")
             return
+        event.should_call_llm(True)
         event.stop_event()
         yield event.plain_result(msg)
 
