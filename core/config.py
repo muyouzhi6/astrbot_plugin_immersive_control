@@ -49,6 +49,8 @@ class PluginConfig(ConfigNode):
     sensitivity: int
     enter_template: str
     exit_template: str
+    enter_reply: str
+    exit_reply: str
 
     def __init__(self, config: AstrBotConfig):
         super().__init__(config)

@@ -166,6 +166,24 @@ class MessageHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(results, ["啊？！等等……特殊装置怎么突然启动了！"])
         self.assertEqual(plugin.store.activated, [event.unified_msg_origin])
 
+    async def test_enter_uses_configured_immediate_reaction(self):
+        mod = _load_module()
+        plugin = object.__new__(mod.ImmersiveControlPlugin)
+        plugin.cfg = types.SimpleNamespace(
+            admin_only_mode=False,
+            enter_keywords={"进入"},
+            exit_keywords={"退出"},
+            enter_reply="启动 {item_name}，敏感度 {sensitivity}%",
+            item_name="toy",
+            sensitivity=80,
+        )
+        plugin.store = _Store()
+        event = _Event("进入")
+
+        results = [result async for result in plugin.message_handler(event)]
+
+        self.assertEqual(results, ["启动 toy，敏感度 80%"])
+
     async def test_multiword_exit_keyword_is_matched(self):
         mod = _load_module()
         plugin = object.__new__(mod.ImmersiveControlPlugin)
